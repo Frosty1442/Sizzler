@@ -160,3 +160,18 @@ seeds/
 # Papers and temporary files
 *.pdf
 sizzler_paper.txt
+
+# AFL fuzzer output directories
+openplc_output/
+plc_output/
+*_output/
+
+# AFL fuzzer temporary files
+.cur_input
+fuzz_bitmap
+fuzzer_stats
+
+# Compiled binaries for testing (generated during fuzzing)
+test_program
+plc_modbus_vulnerable
+
