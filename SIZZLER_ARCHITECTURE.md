@@ -1,23 +1,37 @@
-# Sizzler Architecture - From the Paper
+# Sizzler Architecture - Complete Analysis from IEEE TIFS 2024 Paper
+
+## Paper Reference
+**Title:** Sizzler: Sequential fuzzing in ladder diagrams for vulnerability detection and discovery in Programmable Logic Controllers
+**Authors:** Kai Feng, Marco M. Cook, Angelos K. Marnerides
+**Published:** IEEE Transactions on Information Forensics and Security, 2024
+**DOI:** 10.1109/TIFS.2023.3340615
 
 ## What Sizzler Actually Does
 
 Sizzler is **NOT** just generic AFL fuzzing. It's a specialized vulnerability discovery framework for **Programmable Logic Controllers (PLCs)** that combines:
-1. **AFL fuzzing** (modified)
-2. **Seq-GAN** (Sequential Generative Adversarial Network)
-3. **PLC firmware emulation**
+1. **Modified AFL fuzzing** with enhanced havoc strategy
+2. **SeqGAN** (Sequential Generative Adversarial Network) with policy gradient
+3. **PLC firmware emulation** via QEMU + Avatar2
+4. **Effector map** tracking for matebytes identification
 
 ## The Problem Being Solved
 
-- PLCs control critical infrastructure (nuclear, energy, manufacturing)
-- PLC firmware is proprietary and vendor-locked
+- PLCs control critical infrastructure (nuclear, energy, manufacturing, utilities)
+- PLC firmware is proprietary and vendor-locked (no generic solutions)
 - Ladder Diagrams (LD) are the most common PLC programming language
-- Standard fuzzing doesn't work well on PLCs
+- Standard fuzzing doesn't work well on PLCs (lack of feedback mechanisms)
 - No generic vulnerability detection exists for PLCs
+- PLC compilers lack fundamental security checks during ladder diagram compilation
+- Vendor-specific instruction sets make generic analysis impossible
 
 ## Key Innovation
 
-**Seq-GAN learns optimal sequences of mutation operators** from AFL's havoc stage to generate better test cases that discover deeper code paths in PLC ladder logic.
+**SeqGAN learns optimal sequences of mutation operators** from AFL's havoc stage using:
+- **LSTM Generator** (2 layers, 128 units each, 0.001 learning rate)
+- **CNN Discriminator** (3 layers)
+- **Policy Gradient** updates based on rewards (Equation 2 in paper)
+- **Matebytes** targeting from effector map (bytes causing different code paths)
+- **Every 10 cycles** retraining with new operator sequences
 
 ---
 
@@ -348,3 +362,340 @@ Sizzler is NOT about fuzzing random C programs. It's a sophisticated system that
 6. Discovers real vulnerabilities in industrial control systems
 
 The refactored Python code (sizzler/) is ONLY the Seq-GAN component. The full system requires the AFL fuzzer, MCU emulation, and ladder diagram conversion pipeline working together.
+
+## CVEs Discovered by Sizzler
+
+### CVE-2023-43184 - OpenPLC Buffer Overflow ⭐
+**Severity:** HIGH  
+**CWE:** CWE-120 (Buffer Overflow)  
+**CVE Link:** https://packetstormsecurity.com/files/174582/OpenPLC-Webserver-3-Denial-Of-Service-Buffer-Overflow.html
+
+**Description:**  
+Buffer overflow vulnerability in OpenPLC runtime that enables attackers to:
+- Inject malicious code via slave device attributes
+- Escalate to root privileges
+- Cause server crash when PLC connects with equipment via Modbus protocol
+
+**Location:** Modbus/TCP connection handling in OpenPLC runtime
+
+**How Sizzler Found It:**  
+- Fuzzed Modbus slave device attribute strings
+- Generated abnormally large inputs for device names/attributes
+- Triggered overflow when PLC runtime processed Modbus connection
+- Binary crashed reproducibly with specific input patterns
+
+### CVE-2018-20818 - OpenPLC Memory Corruption
+**Severity:** MEDIUM  
+**CWE:** CWE-787 (Out-of-bounds Write)
+
+**Description:**  
+Buffer named `in memory` declared in `glue_generator.cpp` file is also invoked in `modbus.cpp` and is susceptible to being overwritten beyond its 1024th position, thereby interrupting the loop and causing the runtime to halt.
+
+**Location:**  
+- `glue_generator.cpp` - Buffer declaration
+- `modbus.cpp` - Buffer usage
+
+### Additional Vulnerabilities Found
+
+#### Timer Integer Overflow
+**Type:** Integer Overflow → Infinite Loop  
+**Description:** Sizzler identified an integer overflow in the Ladder Diagram timer function. When abnormally large value assigned to input parameter, the program enters an infinite loop within OpenPLC environment.
+
+**Example:**  
+```c
+// Timer with max value causes overflow
+timer_value = 0xFFFFFFFF;  // Sizzler sets this
+// Causes infinite loop in timer counting logic
+```
+
+#### Cycle Integer Overflow  
+**Type:** Integer Overflow → Logic Bypass  
+**Description:** The `Ui_Ccycle` variable controls three output coils based on cycle count ranges. When Sizzler increments `Ui_Ccycle` to maximum value, it wraps around to 0, causing program to execute indefinitely with incorrect coil states.
+
+**Example:**  
+```c
+// Cycle counter wraps around
+if (Ui_Ccycle < 100) output1 = ON;
+else if (Ui_Ccycle < 200) output2 = ON;
+else output3 = ON;
+// When Ui_Ccycle = MAX → wraps to 0, output1 = ON forever
+```
+
+---
+
+## Vulnerability Types Tested
+
+### 1. Race Condition Competition (RC)
+**Example:** Two processes concurrently request the same resource. Output value of `y_new` changes from 0 to 1 within two cycles even though inputs are fixed.
+
+**Ladder Logic Pattern:**
+```
+Rung 1: X_input → [SET Y_output]
+Rung 2: X_input → [RESET Y_output]
+```
+
+### 2. Infinite Loop (IL)
+**Impact:** Consumes excessive CPU resources, causes PLC crash  
+**How Created:** LD contains unconditional jump back to same rung or cycle without termination condition
+
+### 3. Hard-coded Logical Comparator (CH)
+**Risk:** Embedded in application, accessible by attackers  
+**Example:** `if (var == 0x12345678)` - attacker reverse engineers and modifies var
+
+### 4. Missing Jumps and Links (MJL)
+**Attack Vector:** Attacker identifies unused memory addresses and inserts malicious code in empty jump target spaces
+
+### 5. Hidden Jumpers (HJ)
+**Problem:** Jump mechanism skips elements unintentionally. Jumper coded to bypass single element may skip entire branch or multiple elements.
+
+### 6. Object Repeat Reference (ORR)
+**Issue:** One output controlled by different inputs. Output coil duplicated in LD, gets de-energized depending on which rung executes, resulting in undesired output.
+
+### 7. Unused Objects (UO)
+**Vulnerability:** Variables remain unused in large PLC programs, not detected by compiler. Open entry points for malicious code injection.
+
+### 8. Missing Certain Coils/Outputs
+**Impact:** Rung missing output coil (OTE, latches, sets, unlatches) leads to dependency issues affecting other tags.
+
+---
+
+## Implementation Requirements (What's Missing)
+
+### ⚠️ CRITICAL: Current Repository Status
+
+**What EXISTS:**
+- ✅ Seq-GAN Python models (Generator, Discriminator, Target LSTM, Rollout)
+- ✅ Training infrastructure (data iterators, policy gradient loss)
+- ✅ AFL 2.57b fuzzer source code
+- ✅ 32 Ladder Diagram test files (.ld format)
+- ✅ Python packaging (pyproject.toml, setup.py)
+- ✅ Docker support
+
+**What's MISSING (Must Implement):**
+- ❌ LDmicro or OpenPLC installation/integration
+- ❌ LD → C conversion pipeline
+- ❌ QEMU + Avatar2 emulation setup
+- ❌ Custom GPIO driver for QEMU
+- ❌ Custom I2C driver for QEMU
+- ❌ Modbus/TCP via Avatar2
+- ❌ AFL modification to record mutation operator sequences
+- ❌ Integration between AFL and Seq-GAN
+- ❌ Effector map implementation
+- ❌ Matebyte tracking
+- ❌ Training data generation from AFL
+
+### Required Dependencies
+
+**System Level:**
+```bash
+# LDmicro - Ladder diagram compiler
+# Download from: https://github.com/LDmicro/LDmicro
+# OR use package manager if available
+
+# OpenPLC - Open-source PLC runtime
+# Clone from: https://github.com/thiagoralves/OpenPLC_v3
+# Follow build instructions
+
+# QEMU - MCU emulator
+apt-get install qemu-system-arm qemu-system-avr
+
+# Avatar2 - Dynamic analysis framework
+pip install avatar2
+
+# Additional libraries
+apt-get install libglib2.0-dev libpixman-1-dev
+```
+
+**Python Packages (add to requirements.txt):**
+```
+avatar2>=1.4.0
+keystone-engine>=0.9.2
+capstone>=4.0.2
+unicorn>=1.0.2
+```
+
+### Implementation Steps
+
+#### Step 1: Setup LDmicro/OpenPLC
+```bash
+# Option A: LDmicro
+git clone https://github.com/LDmicro/LDmicro
+cd LDmicro && mkdir build && cd build
+cmake .. && make
+# Creates ldmicro binary that can compile .ld → .c
+
+# Option B: OpenPLC
+git clone https://github.com/thiagoralves/OpenPLC_v3.git
+cd OpenPLC_v3 && ./install.sh linux
+# Creates glue_generator that converts IEC 61131-3 → C
+```
+
+#### Step 2: Convert Ladder Diagrams
+```bash
+# For each .ld file in "Ladder Diagram Testbed/"
+for ld_file in "Ladder Diagram Testbed"/*.ld; do
+    # LDmicro method
+    ldmicro -c "$ld_file" -o "$(basename $ld_file .ld).c"
+    
+    # OR OpenPLC method (requires .st structured text)
+    # Need to convert .ld → .st first
+done
+```
+
+#### Step 3: Instrument with AFL
+```bash
+# Build AFL
+cd Fuzzing && make
+
+# Compile each converted C file
+export AFL_USE_ASAN=1  # Enable AddressSanitizer
+./afl-gcc -o test_binary test_program.c -ITARGET_MCU_HEADERS
+```
+
+#### Step 4: Setup QEMU Emulation
+```python
+# Python script using Avatar2
+from avatar2 import *
+
+# Create Avatar instance
+avatar = Avatar(arch=ARM_CORTEX_M3)
+
+# Add QEMU target
+qemu = avatar.add_target(QemuTarget, 
+                         executable="test_binary",
+                         cpu_model="cortex-m3")
+
+# Map GPIO memory region (example for STM32)
+GPIO_BASE = 0x40020000
+GPIO_SIZE = 0x2C00
+avatar.add_memory_range(GPIO_BASE, GPIO_SIZE, 
+                        name='gpio', permissions='rw')
+
+# Map I2C memory region
+I2C_BASE = 0x40005400
+I2C_SIZE = 0x400
+avatar.add_memory_range(I2C_BASE, I2C_SIZE,
+                        name='i2c', permissions='rw')
+
+# Start emulation
+avatar.init_targets()
+qemu.cont()
+```
+
+#### Step 5: Modify AFL to Record Sequences
+```c
+// In afl-fuzz.c, add to havoc_stage function:
+
+FILE *sequence_log = fopen("operator_sequences.txt", "a");
+
+// When new path found:
+if (fault == FAULT_NONE && new_bits) {
+    // Log the sequence of operators that led here
+    for (int i = 0; i < havoc_stack_len; i++) {
+        fprintf(sequence_log, "%d ", havoc_stack[i]);
+    }
+    fprintf(sequence_log, "\n");
+    fflush(sequence_log);
+}
+
+fclose(sequence_log);
+```
+
+#### Step 6: Train Seq-GAN
+```python
+# Use existing sizzler package
+from sizzler.models.generator import Generator
+from sizzler.models.discriminator import Discriminator
+from sizzler.training.data_iter import GenDataIter
+from sizzler.training.loss import PGLoss
+
+# Load AFL operator sequences
+with open('operator_sequences.txt') as f:
+    sequences = [[int(x) for x in line.split()] for line in f]
+
+# Train model (see sizzler/main.py for complete training loop)
+# ... training code ...
+```
+
+#### Step 7: Feed Generated Sequences Back to AFL
+```c
+// In AFL, read Seq-GAN generated sequences
+FILE *seqgan_output = fopen("generated_sequences.txt", "r");
+
+// Use these sequences instead of random havoc
+while (fscanf(seqgan_output, "%d", &operator_id) == 1) {
+    apply_mutation_operator(operator_id, buffer, len);
+}
+```
+
+---
+
+## Evaluation Results from Paper
+
+### PLC Binary Testing
+- **30 vulnerable PLC binaries** tested across 5 MCUs
+- **Average function coverage:** 88.4%
+- **Average basic block coverage:** 71.29%  
+- **Average edge coverage:** 61.4%
+- **Crashes found:** 29 out of 30 programs
+- **Typical execution time:** 40-67 minutes per binary (10 cycles)
+
+### Comparison with Other Fuzzers (LAVA-M Dataset)
+- **Sizzler:** 44 bugs (base64), 46 (md5sum), 18 (uniq), 981 (who)
+- **Sizzler+Angora:** 48 bugs (base64), 57 (md5sum), 28 (uniq), 1711 (who) ⭐ BEST
+- **NEUZZ:** 46, 55, 27, 1562
+- **Angora:** 48, 57, 26, 1531
+- **AFL++:** 3, 1, 19, 772
+- **AFL:** 0, 0, 2, 1
+
+### Magma Dataset
+- **Sizzler:** 39 bugs average
+- **MOPT:** 37 bugs  
+- **AFL++:** 19 bugs
+- **Angora:** 17 bugs
+- **NEUZZ:** 15 bugs
+
+### Performance
+- **Execution speed:** 0-3500 exec/sec (Sizzler) vs 0-600 exec/sec (others)
+- **Reason:** Emulation on native architecture, focus on havoc stage
+
+---
+
+## Key Takeaways
+
+1. **Sizzler is NOT just Python code** - it's a complete fuzzing pipeline with AFL + Seq-GAN + QEMU emulation
+2. **Training data is NOT random integers** - it's sequences of AFL mutation operators that found new paths
+3. **Can't test without full pipeline** - need LD→C→Binary→QEMU→AFL→Seq-GAN loop
+4. **Two CVEs discovered** - CVE-2023-43184 (buffer overflow) and CVE-2018-20818 (memory corruption)
+5. **Works beyond PLCs** - achieves high performance on LAVA-M and Magma datasets
+6. **Hybrid approach wins** - Sizzler+Angora combination achieved best results
+
+---
+
+## Citations & References
+
+**Main Paper:**
+```bibtex
+@article{feng2024sizzler,
+  title={Sizzler: Sequential fuzzing in ladder diagrams for vulnerability detection and discovery in Programmable Logic Controllers},
+  author={Feng, Kai and Cook, Marco M and Marnerides, Angelos K},
+  journal={IEEE Transactions on Information Forensics and Security},
+  volume={19},
+  pages={1660--1671},
+  year={2024},
+  doi={10.1109/TIFS.2023.3340615}
+}
+```
+
+**Key Technologies:**
+- AFL: https://lcamtuf.coredump.cx/afl/
+- SeqGAN: Yu et al. (2017), AAAI Conference
+- QEMU: https://www.qemu.org/
+- Avatar2: Muench et al. (2018)
+- OpenPLC: https://openplcproject.com
+- LDmicro: https://cq.cx/ladder.pl
+
+**Related CVEs:**
+- CVE-2023-43184: https://packetstormsecurity.com/files/174582/
+- CVE-2018-20818: OpenPLC memory corruption
+
