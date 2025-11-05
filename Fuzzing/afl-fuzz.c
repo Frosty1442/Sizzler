@@ -6106,10 +6106,15 @@ havoc_stage:
   stage_cur_byte = -1;
     int a[6400][154];
   int x,y;
-  FILE* fop = fopen("/home/gla/data/gene.data","r");
+
+  /* Use environment variable or default path for Seq-GAN data */
+  char* seqgan_path = getenv("SIZZLER_SEQGAN_DATA");
+  if (!seqgan_path) seqgan_path = "./data/gene.data";
+
+  FILE* fop = fopen(seqgan_path, "r");
   if(fop == NULL)
   {
-    ACTF("No file");
+    ACTF("No Seq-GAN data file found at %s", seqgan_path);
   }
   for(x=0;x<6400;x++)
   {
