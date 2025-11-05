@@ -15,13 +15,16 @@ Sizzler focuses on the analysis of executed ladder logic and implements a mutati
 
 ### System Requirements
 - Linux-based operating system
-- Python 3.6 or higher
+- Python 3.8 or higher
 - GCC/Clang compiler (for AFL fuzzer)
-- CUDA 8.0 or higher (optional, for GPU acceleration)
+- CUDA 11.0 or higher (optional, for GPU acceleration)
+- Docker 20.10+ (recommended for easiest setup)
 
 ### Python Dependencies
-- PyTorch >= 1.0.0
-- NumPy >= 1.15.0
+- PyTorch >= 2.0.0
+- NumPy >= 1.24.0
+
+**Note**: Using Docker is the recommended installation method as it handles all dependencies automatically.
 
 ## Installation
 
@@ -58,6 +61,101 @@ To build the AFL fuzzer component:
 cd Fuzzing
 make
 cd ..
+```
+
+### Docker Installation (Recommended)
+
+The easiest way to get started with Sizzler is using Docker, which provides a consistent environment with all dependencies pre-installed.
+
+#### Prerequisites
+- Docker 20.10+
+- Docker Compose 2.0+ (optional, for easier management)
+
+#### Quick Start with Docker
+
+```bash
+# Build the Docker image
+docker build -t sizzler-fuzzer .
+
+# Run an interactive shell
+docker run -it --rm \
+  -v $(pwd):/sizzler \
+  -v sizzler-output:/sizzler/output \
+  sizzler-fuzzer
+
+# Or use Docker Compose for easier management
+docker-compose up -d
+docker-compose exec sizzler bash
+```
+
+#### Docker Compose Usage
+
+The included `docker-compose.yml` provides a convenient way to manage Sizzler:
+
+```bash
+# Start the container in detached mode
+docker-compose up -d
+
+# Access the container
+docker-compose exec sizzler bash
+
+# View logs
+docker-compose logs -f sizzler
+
+# Stop the container
+docker-compose down
+
+# Stop and remove volumes
+docker-compose down -v
+```
+
+#### What's Included in the Docker Image
+
+- Ubuntu 24.04 base
+- Python 3.11
+- Clang/LLVM 15
+- Pre-built AFL fuzzer
+- PyTorch 2.x (CPU-only for smaller image size)
+- All Python dependencies
+- Ladder diagram test cases
+
+#### Docker Environment Variables
+
+The Docker container respects these environment variables:
+
+- `SIZZLER_DATA_PATH`: Path to training data (default: `/sizzler/data`)
+- `PYTHONUNBUFFERED`: Set to 1 for immediate output
+
+#### Using Docker for Development
+
+Mount your local directory for live code changes:
+
+```bash
+docker run -it --rm \
+  -v $(pwd):/sizzler \
+  -v sizzler-output:/sizzler/output \
+  -e SIZZLER_DATA_PATH=/sizzler/data \
+  sizzler-fuzzer bash
+
+# Inside container, any changes to mounted files are reflected immediately
+python3 -m pytest tests/
+```
+
+#### Building with CUDA Support (Optional)
+
+For GPU acceleration, modify the Dockerfile to use the CUDA base image:
+
+```dockerfile
+FROM nvidia/cuda:12.1.0-base-ubuntu24.04 as builder
+# ... rest of Dockerfile
+```
+
+Then run with GPU support:
+
+```bash
+docker run -it --rm --gpus all \
+  -v $(pwd):/sizzler \
+  sizzler-fuzzer
 ```
 
 ## Usage

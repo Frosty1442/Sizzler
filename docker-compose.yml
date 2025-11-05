@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  sizzler:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: sizzler-fuzzer:latest
+    container_name: sizzler
+    volumes:
+      # Mount current directory for development
+      - .:/sizzler
+      # Persist fuzzing outputs
+      - sizzler-output:/sizzler/output
+      - sizzler-seeds:/sizzler/seeds
+    environment:
+      - SIZZLER_DATA_PATH=/sizzler/data
+      - PYTHONUNBUFFERED=1
+    working_dir: /sizzler
+    # Keep container running
+    command: /bin/bash -c "tail -f /dev/null"
+    # For interactive usage
+    stdin_open: true
+    tty: true
+
+volumes:
+  sizzler-output:
+    driver: local
+  sizzler-seeds:
+    driver: local

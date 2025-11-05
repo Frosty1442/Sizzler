@@ -1,3 +1,4 @@
 # Core dependencies for Sizzler
-torch>=1.0.0,<2.0.0
-numpy>=1.15.0,<2.0.0
+# Using CPU-only torch to reduce size
+torch>=2.0.0
+numpy>=1.24.0

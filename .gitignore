@@ -152,3 +152,11 @@ Fuzzing/afl-showmap
 Fuzzing/afl-tmin
 Fuzzing/afl-analyze
 Fuzzing/afl-gotcpu
+
+# Test artifacts
+test_*
+seeds/
+
+# Papers and temporary files
+*.pdf
+sizzler_paper.txt
