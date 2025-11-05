@@ -1,0 +1,11 @@
+include README.md
+include LICENSE
+include requirements.txt
+include requirements-dev.txt
+recursive-include sizzler *.py
+recursive-include tests *.py
+exclude Fuzzing/*
+exclude "Ladder Diagram Testbed/*"
+global-exclude __pycache__
+global-exclude *.py[cod]
+global-exclude .DS_Store

@@ -1,0 +1,14 @@
+# Development dependencies
+-r requirements.txt
+
+# Testing
+pytest>=6.0.0
+pytest-cov>=2.10.0
+
+# Code quality
+black>=21.0b0
+flake8>=3.9.0
+isort>=5.0.0
+
+# Type checking (optional for Python 3.6+)
+mypy>=0.900; python_version >= "3.7"

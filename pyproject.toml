@@ -1,0 +1,74 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sizzler-fuzzer"
+version = "0.1.0"
+description = "Sequential Fuzzing in Ladder Diagrams for PLC Vulnerability Detection using Seq-GAN"
+readme = "README.md"
+requires-python = ">=3.6"
+license = {text = "MIT"}
+authors = [
+    {name = "Sizzler Contributors"}
+]
+keywords = ["fuzzing", "PLC", "ladder-logic", "GAN", "security", "vulnerability-detection", "AFL"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "Topic :: Security",
+    "Topic :: Software Development :: Testing",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.6",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+]
+
+dependencies = [
+    "torch>=1.0.0",
+    "numpy>=1.15.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=6.0",
+    "pytest-cov>=2.10",
+    "black>=21.0",
+    "flake8>=3.9",
+]
+cuda = [
+    "torch>=1.0.0",
+]
+
+[project.scripts]
+sizzler = "sizzler.main:main"
+
+[project.urls]
+Homepage = "https://github.com/Frosty1442/Sizzler"
+Repository = "https://github.com/Frosty1442/Sizzler"
+
+[tool.setuptools]
+packages = ["sizzler", "sizzler.models", "sizzler.training", "sizzler.utils"]
+
+[tool.setuptools.package-data]
+sizzler = ["*.txt", "*.md"]
+
+[tool.black]
+line-length = 100
+target-version = ["py36", "py37", "py38"]
+exclude = '''
+/(
+    \.git
+  | \.venv
+  | build
+  | dist
+  | Fuzzing
+)/
+'''
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
+addopts = "-v --cov=sizzler --cov-report=html --cov-report=term-missing"
