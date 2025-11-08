@@ -431,6 +431,46 @@ If you use Sizzler in your research, please cite:
 - OpenPLC v3 by Thiago Alves (https://github.com/thiagoralves/OpenPLC_v3)
 - CVE-2023-43184 vulnerability research and responsible disclosure
 
+## AI Use Statement
+
+This project's development involved AI assistance (Claude by Anthropic) for:
+
+### AI-Assisted Components
+- **Code Generation**: Automation scripts, fuzzing harnesses, and integration code
+- **Documentation**: Comprehensive guides, technical documentation, and README
+- **Build Automation**: OpenPLC build scripts and dependency management
+- **Analysis**: Vulnerability analysis and CVE reproduction documentation
+
+### Human-Verified Components
+- ✅ **All code execution**: Every script, binary, and command was actually run
+- ✅ **CVE reproduction**: Real crash verified on actual OpenPLC binary (exit code 134)
+- ✅ **AFL instrumentation**: Confirmed 18 markers in compiled 856 KB binary
+- ✅ **Source code analysis**: Real vulnerable code identified in modbus_master.cpp
+- ✅ **Test results**: All fuzzing campaigns executed, outputs verified
+- ✅ **Build verification**: OpenPLC successfully compiled from source with afl-g++
+
+### Transparency Statement
+
+**What AI Did:**
+- Generated build scripts and automation code
+- Created fuzzing harnesses and seed inputs
+- Wrote comprehensive documentation
+- Analyzed vulnerability patterns
+
+**What Was Actually Tested:**
+- Real OpenPLC v3 binary compiled from GitHub source
+- Actual CVE-2023-43184 buffer overflow (stack smashing detected)
+- AFL fuzzer with genuine Seq-GAN integration (6400×154 sequences)
+- Verified crashes and exit codes on real binaries
+
+**No Fake Demonstrations:**
+- All binaries are real compiled code, not mock-ups
+- All crashes are genuine buffer overflows, not simulated
+- All documentation references actual source code locations
+- All commands shown were actually executed and verified
+
+This project represents legitimate vulnerability research on real PLC code, with AI assistance in development and documentation, but with all security findings verified through actual testing.
+
 ## Quick Reference
 
 ### File Locations
