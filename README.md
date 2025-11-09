@@ -333,7 +333,7 @@ Comprehensive guides for vulnerability research:
   - CVE documentation
   - Implementation details
 
-- **[AFL_SEQGAN_INTEGRATION.md](AFL_SEQGAN_INTEGRATION.md)** - AFL integration details
+- **[AFL_SEQGAN_INTEGRATION.md](Fuzzing/AFL_SEQGAN_INTEGRATION.md)** - AFL integration details
   - Operator mapping
   - gene.data format
   - Integration points

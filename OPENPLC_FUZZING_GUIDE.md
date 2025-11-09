@@ -19,7 +19,7 @@ Fuzz test OpenPLC PLC runtime with AFL + Seq-GAN to discover vulnerabilities in 
 **Location:** `/tmp/OpenPLC_v3`
 **Binary:** `/tmp/OpenPLC_v3/webserver/core/openplc`
 **Compilation:** AFL-instrumented with `afl-g++`
-**Size:** 876KB
+**Size:** 856KB
 
 **Build Process:**
 1. Cloned OpenPLC v3 from GitHub

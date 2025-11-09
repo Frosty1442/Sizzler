@@ -547,9 +547,12 @@ done
 # Build AFL
 cd Fuzzing && make
 
-# Compile each converted C file
+# Compile each converted C file (example)
 export AFL_USE_ASAN=1  # Enable AddressSanitizer
-./afl-gcc -o test_binary test_program.c -ITARGET_MCU_HEADERS
+./afl-gcc -o plc_binary plc_program.c -ITARGET_MCU_HEADERS
+
+# For OpenPLC fuzzing (actual implementation):
+./afl-gcc -o openplc_modbus_harness openplc_modbus_harness.c
 ```
 
 #### Step 4: Setup QEMU Emulation
@@ -561,8 +564,8 @@ from avatar2 import *
 avatar = Avatar(arch=ARM_CORTEX_M3)
 
 # Add QEMU target
-qemu = avatar.add_target(QemuTarget, 
-                         executable="test_binary",
+qemu = avatar.add_target(QemuTarget,
+                         executable="plc_binary",
                          cpu_model="cortex-m3")
 
 # Map GPIO memory region (example for STM32)
